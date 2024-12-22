@@ -7,6 +7,7 @@ import { getGroups } from "@/app/actions";
 export default function DataTable() {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart>(null);
+  const group: string = "Commodity";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,7 +27,7 @@ export default function DataTable() {
       ];
 
       try {
-        const { labels, values } = await getGroups();
+        const { labels, values } = await getGroups(group);
 
         const chartData: ChartData = {
           labels: labels,
@@ -47,14 +48,14 @@ export default function DataTable() {
             responsive: true,
             plugins: {
               legend: {
-                position: "right",
+                position: "bottom",
                 labels: {
                   padding: 20,
                 },
               },
               title: {
                 display: true,
-                text: "Commodity Distribution",
+                text: group + " Distribution",
                 font: {
                   size: 16,
                 },
