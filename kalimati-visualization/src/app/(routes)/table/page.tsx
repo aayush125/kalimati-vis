@@ -7,7 +7,7 @@ import { getGroups } from "@/app/actions";
 export default function DataTable() {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart>(null);
-  const group: string = "Commodity";
+  const group: string = "Category";
 
   useEffect(() => {
     const fetchData = async () => {
