@@ -2,8 +2,6 @@
 
 import pl from "nodejs-polars";
 
-const today: Date = new Date("2023-09-28");
-
 export async function getGroups(groupBy: string) {
   const df = pl.readCSV("data/kalimati_final.csv");
 
@@ -18,7 +16,7 @@ export async function getGroups(groupBy: string) {
   return { labels, values };
 }
 
-export async function lastSevenAverages(): Promise<number[]> {
+export async function lastSevenAverages(): Promise<Map<string, number>> {
   const df = pl.readCSV("data/kalimati_final.csv", {
     dtypes: {
       Date: pl.Datetime(),
@@ -27,9 +25,13 @@ export async function lastSevenAverages(): Promise<number[]> {
     },
   });
 
-  const averages: number[] = [];
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
 
-  for (let i = 0; i < 7; i++) {
+  let averages: number[] = [];
+  const day_averages = new Map<string, number>();
+
+  for (let i = 0; i < 70; i++) {
     const day = new Date(today);
     day.setDate(today.getDate() - i);
     const avgPrice = df
@@ -37,7 +39,11 @@ export async function lastSevenAverages(): Promise<number[]> {
       .select(pl.col("Average").mean());
 
     averages.push(avgPrice.getColumn("Average")[0]);
+    day_averages.set(
+      day.getDate().toString(),
+      avgPrice.getColumn("Average")[0]
+    );
   }
 
-  return averages;
+  return new Map([...day_averages].reverse());
 }
