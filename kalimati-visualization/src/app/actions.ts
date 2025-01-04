@@ -31,7 +31,7 @@ export async function lastSevenAverages(): Promise<Map<string, number>> {
   let averages: number[] = [];
   const day_averages = new Map<string, number>();
 
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 7; i++) {
     const day = new Date(today);
     day.setDate(today.getDate() - i);
     const avgPrice = df
