@@ -29,65 +29,75 @@ Chart.register(
 export default function LineGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    values: number[];
+  } | null>(null);
 
   useEffect(() => {
-    const fetchDataAndRenderChart = async () => {
-      if (!canvasRef.current) return;
-
-      if (chartRef.current) {
-        chartRef.current.destroy();
-      }
-
+    const fetchData = async () => {
       try {
         const avgs = await lastSevenAverages();
-        const labels = Array.from(avgs.keys());
-        const values = Array.from(avgs.values());
-
-        const config: ChartConfiguration = {
-          type: "line",
-          data: {
-            labels,
-            datasets: [
-              {
-                label: "Average Prices",
-                data: values,
-                borderColor: "rgb(75, 192, 192)",
-                backgroundColor: "rgba(75, 192, 192, 0.5)",
-                tension: 0.1,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: "bottom",
-              },
-              title: {
-                display: true,
-                text: "Average commodity prices for the last 7 days",
-              },
-            },
-          },
-        };
-
-        const ctx = canvasRef.current.getContext("2d");
-        if (ctx) {
-          chartRef.current = new Chart(ctx, config);
-        }
+        setChartData({
+          labels: Array.from(avgs.keys()),
+          values: Array.from(avgs.values()),
+        });
       } catch (error) {
         console.error("Error fetching data for the chart:", error);
       }
     };
 
-    fetchDataAndRenderChart();
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!canvasRef.current || !chartData) return;
+
+    if (chartRef.current) {
+      chartRef.current.destroy();
+      chartRef.current = null;
+    }
+
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+
+    const config: ChartConfiguration = {
+      type: "line",
+      data: {
+        labels: chartData.labels,
+        datasets: [
+          {
+            label: "Average Prices",
+            data: chartData.values,
+            borderColor: "rgb(75, 192, 192)",
+            backgroundColor: "rgba(75, 192, 192, 0.5)",
+            tension: 0.1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: "bottom" as const,
+          },
+          title: {
+            display: true,
+            text: "Average commodity prices for the last 7 days",
+          },
+        },
+      },
+    };
+
+    chartRef.current = new Chart(ctx, config);
 
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
+        chartRef.current = null;
       }
     };
-  }, []);
+  }, [chartData]);
 
   return <canvas ref={canvasRef} />;
 }
