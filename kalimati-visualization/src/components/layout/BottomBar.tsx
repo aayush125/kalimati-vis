@@ -24,6 +24,14 @@ export default function BottomBar() {
       >
         Price Distribution
       </Link>
+      <Link
+        href="/price-vs-arrival"
+        className={`${
+          pathname === "/price-vs-arrival" ? "text-blue-500" : "text-white"
+        } hover:text-blue-700`}
+      >
+        Price vs Arrival
+      </Link>
     </div>
   );
 }
