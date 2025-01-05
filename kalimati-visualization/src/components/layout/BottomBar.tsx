@@ -7,7 +7,7 @@ export default function BottomBar() {
   const pathname = usePathname();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t p-4 flex flex-row justify-center items-center gap-4">
+    <div className="fixed bottom-0 left-0 right-0 border-t bg-black p-4 flex flex-row justify-center items-center gap-4">
       <Link
         href="/"
         className={`${
