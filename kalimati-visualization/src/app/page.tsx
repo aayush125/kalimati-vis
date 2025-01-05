@@ -1,6 +1,7 @@
 "use client";
 
 import LineGraph from "@/components/HomeLineGraph";
+import SeasonData from "@/components/SeasonalData";
 
 export default function Home() {
   return (
@@ -15,7 +16,8 @@ export default function Home() {
           </div>
         </div>
         <div className="border-2 border-green-500 w-2/5 h-full flex justify-center items-center">
-          Seasonal common items and evergreen list go here
+          {/* Seasonal common items and evergreen list go here */}
+          <SeasonData />
         </div>
       </div>
       <div className="flex justify-center items-center w-full h-1/6 border-2 border-white">
