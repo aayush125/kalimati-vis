@@ -21,6 +21,37 @@ export async function getGroups(groupBy: string) {
   return { labels, values };
 }
 
+export async function uniqueArrivalsYesterday() {
+  // Load the dataset
+  const df = pl.readCSV("data/arrival.csv", {
+    dtypes: {
+      Date: pl.Datetime(),
+      Arrival: pl.Int64,
+      Family: pl.Utf8,
+    },
+  });
+
+  // Get yesterday's date in the format matching the dataset
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+  today.setDate(today.getDate() - 1);
+  const yesterday = new Date(today);
+
+  // Filter for arrivals on yesterday
+  const yesterdayArrivals = df
+    .filter(pl.col("Date").eq(yesterday))
+    .select("Family", "Arrival")
+    .unique();
+
+  // Convert yesterday's arrivals to Map<string, number>
+  const arrivals = new Map<string, number>();
+  yesterdayArrivals.rows().forEach((row) => {
+    arrivals.set(row[0] as string, row[1] as number);
+  });
+
+  return arrivals;
+}
+
 export async function lastSevenAverages(): Promise<Map<string, number>> {
   const df = pl.readCSV("data/kalimati_final.csv", {
     dtypes: {
@@ -322,4 +353,8 @@ export async function calculateSeasonalMetrics(): Promise<Map<string, any>> {
     console.error("Error in calculateSeasonalMetrics:", error);
     throw error;
   }
+}
+
+export async function arrivalPieChart() {
+  const df = pl.readCSV("data/arrival.csv");
 }
