@@ -34,6 +34,37 @@ export async function getGroups(groupBy: string) {
   return { labels, values };
 }
 
+export async function uniqueArrivalsYesterday() {
+  // Load the dataset
+  const df = pl.readCSV("data/arrival.csv", {
+    dtypes: {
+      Date: pl.Datetime(),
+      Arrival: pl.Int64,
+      Family: pl.Utf8,
+    },
+  });
+
+  // Get yesterday's date in the format matching the dataset
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+  today.setDate(today.getDate() - 1);
+  const yesterday = new Date(today);
+
+  // Filter for arrivals on yesterday
+  const yesterdayArrivals = df
+    .filter(pl.col("Date").eq(yesterday))
+    .select("Family", "Arrival")
+    .unique();
+
+  // Convert yesterday's arrivals to Map<string, number>
+  const arrivals = new Map<string, number>();
+  yesterdayArrivals.rows().forEach((row) => {
+    arrivals.set(row[0] as string, row[1] as number);
+  });
+
+  return arrivals;
+}
+
 export async function lastSevenAverages(): Promise<Map<string, number>> {
   const df = pl.readCSV("data/kalimati_final.csv", {
     dtypes: {
@@ -180,6 +211,85 @@ export async function getCommodityMonthlyDistribution(): Promise<
   });
 
   return distribution;
+}
+
+export async function calculateSeasonalMetrics(): Promise<Map<string, any>> {
+  // Read the CSV file
+  const df = pl.readCSV("data/kalimati_final_season.csv", {
+    dtypes: {
+      Date: pl.Datetime(),
+      Commodity: pl.Utf8,
+      Unit: pl.Utf8,
+      Minimum: pl.Float64,
+      Maximum: pl.Float64,
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Group: pl.Utf8,
+      Category: pl.Utf8,
+      Season: pl.Utf8,
+    },
+  });
+
+  // Function to calculate box plot metrics for a given dataframe
+  function calculateBoxPlotMetrics(group: pl.DataFrame): any {
+    const metrics = {
+      min: group.select(pl.col("Average").min()).getColumn("Average")[0],
+      q1: group
+        .select(pl.col("Average").quantile(0.25))
+        .getColumn("Average")[0],
+      median: group.select(pl.col("Average").median()).getColumn("Average")[0],
+      q3: group
+        .select(pl.col("Average").quantile(0.75))
+        .getColumn("Average")[0],
+      max: group.select(pl.col("Average").max()).getColumn("Average")[0],
+      mean: group.select(pl.col("Average").mean()).getColumn("Average")[0],
+      std: group.select(pl.col("Average").std()).getColumn("Average")[0],
+    };
+
+    return metrics;
+  }
+
+  try {
+    // Get unique commodities
+    const commodityDf = df.select("Commodity").unique();
+    const commodities = commodityDf.getColumn("Commodity").toArray();
+
+    const resultMap = new Map<string, any>();
+
+    // Calculate metrics for each commodity and season
+    for (const commodity of commodities) {
+      // Filter for current commodity using string literal
+      const commodityData = df.filter(
+        pl.col("Commodity").eq(pl.lit(commodity))
+      );
+
+      // Get unique seasons for this commodity
+      const seasonDf = commodityData.select("Season").unique();
+      const seasons = seasonDf.getColumn("Season").toArray();
+
+      const seasonMetrics: { [key: string]: any } = {};
+
+      for (const season of seasons) {
+        // Filter for current season using string literal
+        const seasonData = commodityData.filter(
+          pl.col("Season").eq(pl.lit(season))
+        );
+        const metrics = calculateBoxPlotMetrics(seasonData);
+        seasonMetrics[season.toLowerCase()] = metrics;
+      }
+
+      resultMap.set(commodity, seasonMetrics);
+    }
+
+    return resultMap;
+  } catch (error) {
+    console.error("Error in calculateSeasonalMetrics:", error);
+    throw error;
+  }
+}
+
+export async function arrivalPieChart() {
+  const df = pl.readCSV("data/arrival.csv");
 }
 
 const commonItems = ["Potato Red", "Onion Dry", "Tomato Small", "Cauli Local", "Cucumber", "Tomato Big", "Cabbage", "Carrot", "Raddish White", "Okara", "French Bean", "Chilli Green", "Bitter Gourd", "Fish Fresh", "Cow pea", "Brinjal Long", "Squash", "Capsicum", "Lime", "Bottle Gourd", "Pointed Gourd", "Brd Leaf Mustard", "Pumpkin", "Ginger", "Coriander Green", "Christophine", "Mushroom"];

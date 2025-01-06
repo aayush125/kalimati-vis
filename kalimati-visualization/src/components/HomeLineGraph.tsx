@@ -79,11 +79,14 @@ export default function LineGraph() {
         responsive: true,
         plugins: {
           legend: {
-            position: "bottom" as const,
+            display: false,
           },
           title: {
             display: true,
             text: "Average commodity prices for the last 7 days",
+            font: {
+              size: 16,
+            },
           },
         },
       },

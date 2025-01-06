@@ -2,27 +2,29 @@
 
 import LineGraph from "@/components/HomeLineGraph";
 import SeasonData from "@/components/SeasonalData";
+import ArrivalPieChart from "@/components/YesterdayArrivals";
+import { Divider } from "@nextui-org/react";
 
 export default function Home() {
   return (
-    <div className="flex flex-col justify-center items-center w-full h-screen border-2 border-red-500">
-      <div className="flex flex-row justiy-center items-center w-full h-5/6 border-2 border-pink-500">
-        <div className="border-2 border-blue-500 w-3/5 h-full">
-          <div className="border-2 border-cyan-500 w-full h-1/2 flex justify-center items-center">
-            Yesterday's arrival piechart goes here
+    <div className="flex flex-col justify-center items-center w-full h-screen">
+      <div className="flex flex-row justiy-center items-center w-full h-5/6">
+        <div className="w-3/5 h-full">
+          <div className="w-full h-1/2 flex justify-center items-center">
+            <ArrivalPieChart />
           </div>
-          <div className="border-2 border-yellow-500 w-full h-1/2 flex flex-col justify-center items-center">
+          <div className="w-full flex justify-center items-center my-5">
+            <Divider className="w-1/2" />
+          </div>
+          <div className="w-full h-1/2 flex flex-col justify-center items-center">
             <LineGraph />
           </div>
         </div>
-        <div className="border-2 border-green-500 w-2/5 h-full flex justify-center items-center">
-          {/* Seasonal common items and evergreen list go here */}
+        <div className="w-2/5 h-full flex justify-center items-center">
           <SeasonData />
         </div>
       </div>
-      <div className="flex justify-center items-center w-full h-1/6 border-2 border-white">
-        Explore more button here
-      </div>
+      <div className="flex justify-center items-center w-full h-1/6"></div>
     </div>
   );
 }

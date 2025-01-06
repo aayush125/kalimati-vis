@@ -2,12 +2,11 @@
 
 import { Chart, ChartConfiguration, ChartData } from "chart.js/auto";
 import { useEffect, useRef } from "react";
-import { getGroups } from "@/app/actions";
+import { uniqueArrivalsYesterday } from "@/app/actions";
 
-export default function DataTable() {
+export default function ArrivalPieChart() {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart>(null);
-  const group: string = "Category";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,7 +26,15 @@ export default function DataTable() {
       ];
 
       try {
-        const { labels, values } = await getGroups(group);
+        const arrivalData = await uniqueArrivalsYesterday();
+
+        console.log(arrivalData);
+
+        const labels = Array.from(arrivalData.keys());
+        const values = Array.from(arrivalData.values());
+
+        console.log("labels: ", labels);
+        console.log("values: ", values);
 
         const chartData: ChartData = {
           labels: labels,
@@ -48,14 +55,11 @@ export default function DataTable() {
             responsive: true,
             plugins: {
               legend: {
-                position: "bottom",
-                labels: {
-                  padding: 20,
-                },
+                display: false,
               },
               title: {
                 display: true,
-                text: group + " Distribution",
+                text: "Yesterday's Arrivals",
                 font: {
                   size: 16,
                 },
@@ -86,9 +90,5 @@ export default function DataTable() {
     };
   }, []);
 
-  return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <canvas ref={chartRef} />
-    </div>
-  );
+  return <canvas ref={chartRef} />;
 }
