@@ -4,20 +4,19 @@ import csv
 from datetime import datetime, timedelta
 
 # URL and headers
-url = "https://kalimatimarket.gov.np/daily-arrivals"
+url = "https://kalimatimarket.gov.np/price"
 headers = {
     "Cookie": "kalimati_fruits_and_vegetable_market_development_board_session=<session_id>",
 }
 
 # Create CSV file
-output_file = "daily_commodity_data.csv"
+output_file = "daily_price_data.csv"
 with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
     csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(["Date", "Commodity", "Unit", "Arrival"])
+    csvwriter.writerow(["Commodity", "Date", "Unit", "Minimum", "Maximum", "Average"])
 
 # Loop through dates
-# start_date = datetime(2021, 12, 16) # There is no arrival data before this date
-start_date = datetime(2023, 9, 28)
+start_date = datetime(2023, 9, 29)
 end_date = datetime.today()
 current_date = start_date
 
@@ -43,12 +42,13 @@ while current_date <= end_date:
 
                 for row in rows:
                     cells = row.find_all("td")
-                    if len(cells) == 3:  # Ensure it has 3 columns
+                    if len(cells) == 5:  # Ensure it has 5 columns
                         commodity = cells[0].get_text(strip=True)
                         unit = cells[1].get_text(strip=True)
-                        arrival = cells[2].get_text(strip=True).replace(",", "")
-                        if commodity.lower() != "total":  # Skip the "Total" row
-                            csvwriter.writerow([current_date.strftime("%Y-%m-%d"), commodity, unit, arrival])
+                        min_price = cells[2].get_text(strip=True).replace("Rs", "").replace(",", "").strip()
+                        max_price = cells[3].get_text(strip=True).replace("Rs", "").replace(",", "").strip()
+                        avg_price = cells[4].get_text(strip=True).replace("Rs", "").replace(",", "").strip()
+                        csvwriter.writerow([commodity, current_date.strftime("%Y-%m-%d"), unit, min_price, max_price, avg_price])
 
         print(f"Data for {current_date.strftime('%Y-%m-%d')} fetched successfully.")
     else:

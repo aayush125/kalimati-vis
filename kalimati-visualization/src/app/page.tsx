@@ -1,6 +1,7 @@
 "use client";
 
 import LineGraph from "@/components/HomeLineGraph";
+import SeasonData from "@/components/SeasonalData";
 import ArrivalPieChart from "@/components/YesterdayArrivals";
 import { Divider } from "@nextui-org/react";
 
@@ -20,7 +21,7 @@ export default function Home() {
           </div>
         </div>
         <div className="w-2/5 h-full flex justify-center items-center">
-          Seasonal common items and evergreen list go here
+          <SeasonData />
         </div>
       </div>
       <div className="flex justify-center items-center w-full h-1/6"></div>
