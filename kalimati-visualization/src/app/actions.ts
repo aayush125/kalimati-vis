@@ -227,7 +227,7 @@ export async function seasonMostCommon() {
 }
 
 export async function priceVsArrival(familyName: string): Promise<BubbleDataPoint[]> {
-  const df = pl.readCSV("data/arrival.csv", {
+  const df = pl.readCSV(DataFile.Combined, {
     dtypes: {
       Arrival: pl.Float64,
       "Average - Mean": pl.Float64,
@@ -263,4 +263,184 @@ export async function getFamilyList(): Promise<{label: string, key: string}[]> {
   });
   
   return ret;
+}
+
+export async function getFamilyPriceHistory(family: string) {
+  const df = pl.readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Commodity: pl.Utf8,
+    },
+  }).filter(pl.col("Family").eq(pl.lit(family)));
+
+  // console.log(df.select(pl.col("Commodity")).unique().toObject());
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  // Get all unique commodities within the family
+  const commodities = df
+    .select(pl.col("Commodity"))
+    .unique()
+    .sort("Commodity")
+    .getColumn("Commodity")
+    .toArray();
+
+  // Calculate date range (7 days including today)
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    return date;
+  }).reverse();
+
+  // Format dates for labels
+  const labels = dates.map(date => 
+    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  );
+
+  // Process data for each commodity
+  const datasets = commodities.map((commodity: string) => {
+    // Filter data for specific commodity
+    const commodityDf = df.filter(pl.col("Commodity").eq(pl.lit(commodity)));
+
+    // Get prices for each date
+    const data = dates.map(date => {
+      const price = commodityDf
+        .filter(pl.col("Date").eq(date))
+        .select(pl.col("Average"))
+        .getColumn("Average")
+        .toArray();
+
+      // Return null if no price found for that day
+      return price.length > 0 ? price[0] : null;
+    });
+
+    // Create label based on commodity name
+    let label = commodity.replace(`${family}`, '').trim();
+    if (label.startsWith('(') && label.endsWith(')')) {
+      label = label.slice(1, -1);
+    }
+    label = label || 'Normal';  // Use 'Normal' if no specific variant
+
+    return {
+      label,
+      data
+    };
+  });
+
+  return {
+    labels,
+    datasets
+  };
+}
+
+export async function getIndividualFamilyTableData(dfIn: pl.DataFrame<any>, family: string, today: Date) {
+  const df = dfIn.filter(pl.col("Family").eq(pl.lit(family)));
+  
+  const unit = df
+   .select(pl.col("Unit"))
+   .getColumn("Unit")
+   .toArray()[0];
+
+  // Get today's and yesterday's data
+  const todayDf = df.filter(
+    pl.col("Date").eq(pl.lit(today))
+  );
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const yesterdayDf = df.filter(
+    pl.col("Date").eq(pl.lit(yesterday))
+  );
+
+  // Process commodities data for today
+  const commodityPrices: any[] = [];
+  const commodities = df
+    .select(pl.col("Commodity"))
+    .unique()
+    .getColumn("Commodity")
+    .toArray()
+    .map((commodity: string) => {
+      const commodityDf = todayDf.filter(pl.col("Commodity").eq(pl.lit(commodity)));
+      const price = commodityDf
+       .select(pl.col("Average"))
+       .getColumn("Average")
+       .toArray();
+
+      let name = commodity.replace(`${family}`, '').trim();
+      if (name.startsWith('(') && name.endsWith(')')) {
+        name = name.slice(1, -1);
+      }
+      name = name || 'Normal';
+
+      const priceValue = price.length > 0 ? price[0].toFixed(2) : "N/A";
+      if (price.length > 0) {
+        commodityPrices.push(price[0]);
+      }
+
+      return {
+        name,
+        price: priceValue
+      };
+    });
+
+  // Calculate average
+  const averagePrice = commodityPrices.length > 0
+    ? (commodityPrices.reduce((a, b) => a + b, 0) / commodityPrices.length).toFixed(2)
+    : "N/A";
+
+  // Calculate change percentage
+  let changePercent = "N/A";
+  let changeSign = 0;
+
+  const todayAvg = todayDf
+    .select(pl.mean("Average"))
+    .getColumn("Average")
+    .toArray()[0];
+
+  const yesterdayAvg = yesterdayDf
+    .select(pl.mean("Average"))
+    .getColumn("Average")
+    .toArray()[0];
+
+  if (todayAvg !== null && yesterdayAvg !== null && yesterdayAvg !== 0) {
+    const percentChange = ((todayAvg - yesterdayAvg) / yesterdayAvg) * 100;
+    changePercent = `${Math.abs(percentChange).toFixed(1)}%`;
+    changeSign = Math.sign(percentChange);
+    if (changeSign > 0) changePercent = "+" + changePercent;
+    else if (changeSign < 0) changePercent = "-" + changePercent;
+  }
+
+  return {
+    name: family,
+    average: `${averagePrice} / ${unit}`,
+    commodities,
+    changePercent,
+    changeSign
+  };
+}
+
+export async function getCommonItemsTableData() {
+  const df = pl.readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Commodity: pl.Utf8,
+      Unit: pl.Utf8,
+    },
+  });
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+  
+  const tablePromises = commonItems.map((item) => {
+    return getIndividualFamilyTableData(df, item, today);
+  });
+  const tableData = await Promise.all(tablePromises)
+
+  return tableData;
 }
