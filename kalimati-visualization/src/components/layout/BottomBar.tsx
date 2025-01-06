@@ -24,6 +24,14 @@ export default function BottomBar() {
       >
         Price Distribution
       </Link>
+      <Link
+        href="/seasonal-box"
+        className={`${
+          pathname === "/seasonal-box" ? "text-blue-500" : "text-white"
+        } hover:text-blue-700`}
+      >
+        Seasonal Box plot
+      </Link>
     </div>
   );
 }

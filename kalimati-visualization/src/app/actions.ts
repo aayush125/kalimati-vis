@@ -168,3 +168,158 @@ export async function getCommodityMonthlyDistribution(): Promise<
 
   return distribution;
 }
+
+// export async function calculateSeasonalMetrics(): Promise<Map<string, any>> {
+//   // Read the CSV file
+//   const df = pl.readCSV("data/arrival.csv", {
+//     dtypes: {
+//       Date: pl.Datetime(),
+//       Family: pl.Utf8,
+//       Season: pl.Utf8,
+//       "Average - Mean": pl.Float64,
+//       "Group - Mode": pl.Utf8,
+//       "Category - Mode": pl.Utf8,
+//       Arrival: pl.Float64,
+//     },
+//   });
+
+// Function to calculate box plot metrics for a given dataframe
+//   function calculateBoxPlotMetrics(group: pl.DataFrame): any {
+//     const metrics = {
+//       min: group
+//         .select(pl.col("Average - Mean").min())
+//         .getColumn("Average - Mean")[0],
+//       q1: group
+//         .select(pl.col("Average - Mean").quantile(0.25))
+//         .getColumn("Average - Mean")[0],
+//       median: group
+//         .select(pl.col("Average - Mean").median())
+//         .getColumn("Average - Mean")[0],
+//       q3: group
+//         .select(pl.col("Average - Mean").quantile(0.75))
+//         .getColumn("Average - Mean")[0],
+//       max: group
+//         .select(pl.col("Average - Mean").max())
+//         .getColumn("Average - Mean")[0],
+//       mean: group
+//         .select(pl.col("Average - Mean").mean())
+//         .getColumn("Average - Mean")[0],
+//       std: group
+//         .select(pl.col("Average - Mean").std())
+//         .getColumn("Average - Mean")[0],
+//     };
+
+//     return metrics;
+//   }
+
+//   try {
+//     // Get unique families
+//     const familyDf = df.select("Family").unique();
+//     const families = familyDf.getColumn("Family").toArray();
+
+//     const resultMap = new Map<string, any>();
+
+//     // Calculate metrics for each family and season
+//     for (const family of families) {
+//       // Filter for current family using string literal
+//       const familyData = df.filter(pl.col("Family").eq(pl.lit(family)));
+
+//       // Get unique seasons for this family
+//       const seasonDf = familyData.select("Season").unique();
+//       const seasons = seasonDf.getColumn("Season").toArray();
+
+//       const seasonMetrics: { [key: string]: any } = {};
+
+//       for (const season of seasons) {
+//         // Filter for current season using string literal
+//         const seasonData = familyData.filter(
+//           pl.col("Season").eq(pl.lit(season))
+//         );
+//         const metrics = calculateBoxPlotMetrics(seasonData);
+//         seasonMetrics[season.toLowerCase()] = metrics;
+//       }
+
+//       resultMap.set(family, seasonMetrics);
+//     }
+
+//     return resultMap;
+//   } catch (error) {
+//     console.error("Error in calculateSeasonalMetrics:", error);
+//     throw error;
+//   }
+// }
+
+export async function calculateSeasonalMetrics(): Promise<Map<string, any>> {
+  // Read the CSV file
+  const df = pl.readCSV("data/kalimati_final_season.csv", {
+    dtypes: {
+      Date: pl.Datetime(),
+      Commodity: pl.Utf8,
+      Unit: pl.Utf8,
+      Minimum: pl.Float64,
+      Maximum: pl.Float64,
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Group: pl.Utf8,
+      Category: pl.Utf8,
+      Season: pl.Utf8,
+    },
+  });
+
+  // Function to calculate box plot metrics for a given dataframe
+  function calculateBoxPlotMetrics(group: pl.DataFrame): any {
+    const metrics = {
+      min: group.select(pl.col("Average").min()).getColumn("Average")[0],
+      q1: group
+        .select(pl.col("Average").quantile(0.25))
+        .getColumn("Average")[0],
+      median: group.select(pl.col("Average").median()).getColumn("Average")[0],
+      q3: group
+        .select(pl.col("Average").quantile(0.75))
+        .getColumn("Average")[0],
+      max: group.select(pl.col("Average").max()).getColumn("Average")[0],
+      mean: group.select(pl.col("Average").mean()).getColumn("Average")[0],
+      std: group.select(pl.col("Average").std()).getColumn("Average")[0],
+    };
+
+    return metrics;
+  }
+
+  try {
+    // Get unique commodities
+    const commodityDf = df.select("Commodity").unique();
+    const commodities = commodityDf.getColumn("Commodity").toArray();
+
+    const resultMap = new Map<string, any>();
+
+    // Calculate metrics for each commodity and season
+    for (const commodity of commodities) {
+      // Filter for current commodity using string literal
+      const commodityData = df.filter(
+        pl.col("Commodity").eq(pl.lit(commodity))
+      );
+
+      // Get unique seasons for this commodity
+      const seasonDf = commodityData.select("Season").unique();
+      const seasons = seasonDf.getColumn("Season").toArray();
+
+      const seasonMetrics: { [key: string]: any } = {};
+
+      for (const season of seasons) {
+        // Filter for current season using string literal
+        const seasonData = commodityData.filter(
+          pl.col("Season").eq(pl.lit(season))
+        );
+        const metrics = calculateBoxPlotMetrics(seasonData);
+        seasonMetrics[season.toLowerCase()] = metrics;
+      }
+
+      resultMap.set(commodity, seasonMetrics);
+    }
+
+    return resultMap;
+  } catch (error) {
+    console.error("Error in calculateSeasonalMetrics:", error);
+    throw error;
+  }
+}
