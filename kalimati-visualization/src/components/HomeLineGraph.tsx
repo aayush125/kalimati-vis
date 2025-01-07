@@ -26,6 +26,8 @@ Chart.register(
   LineController
 );
 
+Chart.defaults.font.size = 20;
+
 export default function LineGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);

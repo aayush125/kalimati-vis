@@ -174,7 +174,7 @@ const SeasonalBoxplot: React.FC<BoxplotProps> = () => {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 mt-4 bg-black p-4">
+    <div className="flex flex-col items-center gap-4 mt-4 p-4">
       <Autocomplete
         className="max-w-xs"
         label="Select a commodity"
@@ -189,7 +189,7 @@ const SeasonalBoxplot: React.FC<BoxplotProps> = () => {
           </AutocompleteItem>
         ))}
       </Autocomplete>
-      <div className="w-full max-w-4xl bg-black rounded-lg p-4">
+      <div className="w-full max-w-4xl rounded-lg p-4">
         <canvas ref={chartRef} />
       </div>
     </div>
