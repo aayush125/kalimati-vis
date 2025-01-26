@@ -1,12 +1,13 @@
 "use server";
 
 import { BubbleDataPoint } from "chart.js";
+import { time } from "console";
 import pl from "nodejs-polars";
 
 enum DataFile {
   PriceData = "data/kalimati_final.csv",
-  Combined = "data/arrival.csv"
-};
+  Combined = "data/arrival.csv",
+}
 
 export async function getAllUniqueCommodities(): Promise<string[]> {
   const df = pl.readCSV("data/kalimati_final.csv");
@@ -18,7 +19,10 @@ export async function getAllUniqueCommodities(): Promise<string[]> {
 export async function getAllUniqueFamilies(): Promise<string[]> {
   const df = pl.readCSV(DataFile.Combined);
 
-  const uniqueItems = df.groupBy("Family").agg(pl.col("Arrival").sum()).sort(pl.col("Arrival"), true);
+  const uniqueItems = df
+    .groupBy("Family")
+    .agg(pl.col("Arrival").sum())
+    .sort(pl.col("Arrival"), true);
   return uniqueItems.getColumn("Family").toArray();
 }
 
@@ -63,6 +67,73 @@ export async function uniqueArrivalsYesterday() {
   });
 
   return arrivals;
+}
+
+export async function calculateAverages(
+  timeRange: "7D" | "1M" | "1Y"
+): Promise<Map<string, number>> {
+  const df = pl.readCSV("data/kalimati_final.csv", {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+      Commodity: pl.Utf8,
+    },
+  });
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const day_averages = new Map<string, number>();
+
+  switch (timeRange) {
+    case "7D":
+    case "1M": {
+      const dayCount = timeRange === "7D" ? 7 : 30;
+      for (let i = 0; i < dayCount; i++) {
+        const day = new Date(today);
+        day.setDate(today.getDate() - i);
+        const avgPrice = df
+          .filter(pl.col("Date").eq(day))
+          .select(pl.col("Average").mean());
+
+        if (avgPrice.getColumn("Average").length > 0) {
+          const key = `${monthNames[day.getMonth()]} ${day.getDate()}`;
+          day_averages.set(key, avgPrice.getColumn("Average")[0]);
+        }
+      }
+      return new Map([...day_averages].reverse());
+    }
+    case "1Y": {
+      const dayCount = 365;
+      for (let i = 0; i < dayCount; i++) {
+        const day = new Date(today);
+        day.setDate(today.getDate() - i);
+        const avgPrice = df
+          .filter(pl.col("Date").eq(day))
+          .select(pl.col("Average").mean());
+
+        if (avgPrice.getColumn("Average").length > 0) {
+          const key = `${monthNames[day.getMonth()]} ${day.getDate()}`;
+          day_averages.set(key, avgPrice.getColumn("Average")[0]);
+        }
+      }
+      return new Map([...day_averages].reverse());
+    }
+  }
 }
 
 export async function lastSevenAverages(): Promise<Map<string, number>> {
@@ -292,7 +363,35 @@ export async function arrivalPieChart() {
   const df = pl.readCSV("data/arrival.csv");
 }
 
-const commonItems = ["Potato Red", "Onion Dry", "Tomato Small", "Cauli Local", "Cucumber", "Tomato Big", "Cabbage", "Carrot", "Raddish White", "Okara", "French Bean", "Chilli Green", "Bitter Gourd", "Fish Fresh", "Cow pea", "Brinjal Long", "Squash", "Capsicum", "Lime", "Bottle Gourd", "Pointed Gourd", "Brd Leaf Mustard", "Pumpkin", "Ginger", "Coriander Green", "Christophine", "Mushroom"];
+const commonItems = [
+  "Potato Red",
+  "Onion Dry",
+  "Tomato Small",
+  "Cauli Local",
+  "Cucumber",
+  "Tomato Big",
+  "Cabbage",
+  "Carrot",
+  "Raddish White",
+  "Okara",
+  "French Bean",
+  "Chilli Green",
+  "Bitter Gourd",
+  "Fish Fresh",
+  "Cow pea",
+  "Brinjal Long",
+  "Squash",
+  "Capsicum",
+  "Lime",
+  "Bottle Gourd",
+  "Pointed Gourd",
+  "Brd Leaf Mustard",
+  "Pumpkin",
+  "Ginger",
+  "Coriander Green",
+  "Christophine",
+  "Mushroom",
+];
 
 export async function seasonMostCommon() {
   const df = pl.readCSV(DataFile.Combined, {
@@ -312,31 +411,38 @@ export async function seasonMostCommon() {
 
   let data = [];
   // for (let seasonStart = 5; seasonStart < 12; seasonStart += 6) {
-  let seasonStart = 11; {
+  let seasonStart = 11;
+  {
     let expr = pl.lit(false);
-    
+
     for (let i = 2021; i <= 2024; i++) {
       const start = new Date(i, seasonStart, 1);
       const end = new Date(start);
       end.setMonth(end.getMonth() + 3);
-      
-      expr = expr
-        .or(pl.col("Date").gtEq(start).and(pl.col("Date").lt(end))
-        .and(pl.col("Family").isIn(commonItems).not()));
+
+      expr = expr.or(
+        pl
+          .col("Date")
+          .gtEq(start)
+          .and(pl.col("Date").lt(end))
+          .and(pl.col("Family").isIn(commonItems).not())
+      );
     }
-    
+
     const mostCommon = df
-    .filter(expr)
-    .groupBy("Family")
-    .agg(pl.col("Arrival").sum().alias("TotalArrival"))
-    .sort(pl.col("TotalArrival"), true);
+      .filter(expr)
+      .groupBy("Family")
+      .agg(pl.col("Arrival").sum().alias("TotalArrival"))
+      .sort(pl.col("TotalArrival"), true);
 
     // data.push(mostCommon.toObject()["Commodity"]);
     return mostCommon.toObject();
   }
 }
 
-export async function priceVsArrival(familyName: string): Promise<BubbleDataPoint[]> {
+export async function priceVsArrival(
+  familyName: string
+): Promise<BubbleDataPoint[]> {
   const df = pl.readCSV(DataFile.Combined, {
     dtypes: {
       Arrival: pl.Float64,
@@ -345,7 +451,10 @@ export async function priceVsArrival(familyName: string): Promise<BubbleDataPoin
     },
   });
 
-  const res = df.filter(pl.col("Family").eq(pl.lit(familyName))).sort(pl.col("Arrival")).toObject();
+  const res = df
+    .filter(pl.col("Family").eq(pl.lit(familyName)))
+    .sort(pl.col("Arrival"))
+    .toObject();
 
   const len = res["Arrival"].length;
 
@@ -361,9 +470,11 @@ export async function priceVsArrival(familyName: string): Promise<BubbleDataPoin
   return ret;
 }
 
-export async function getFamilyList(): Promise<{label: string, key: string}[]> {
+export async function getFamilyList(): Promise<
+  { label: string; key: string }[]
+> {
   const list = await getAllUniqueFamilies();
-  const ret: {label: string, key: string}[] = [];
+  const ret: { label: string; key: string }[] = [];
 
   list.forEach((e: string) => {
     ret.push({
@@ -371,19 +482,21 @@ export async function getFamilyList(): Promise<{label: string, key: string}[]> {
       key: e,
     });
   });
-  
+
   return ret;
 }
 
 export async function getFamilyPriceHistory(family: string) {
-  const df = pl.readCSV(DataFile.PriceData, {
-    dtypes: {
-      Date: pl.Datetime(),
-      Average: pl.Float64,
-      Family: pl.Utf8,
-      Commodity: pl.Utf8,
-    },
-  }).filter(pl.col("Family").eq(pl.lit(family)));
+  const df = pl
+    .readCSV(DataFile.PriceData, {
+      dtypes: {
+        Date: pl.Datetime(),
+        Average: pl.Float64,
+        Family: pl.Utf8,
+        Commodity: pl.Utf8,
+      },
+    })
+    .filter(pl.col("Family").eq(pl.lit(family)));
 
   // console.log(df.select(pl.col("Commodity")).unique().toObject());
 
@@ -406,8 +519,8 @@ export async function getFamilyPriceHistory(family: string) {
   }).reverse();
 
   // Format dates for labels
-  const labels = dates.map(date => 
-    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const labels = dates.map((date) =>
+    date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
   );
 
   // Process data for each commodity
@@ -416,7 +529,7 @@ export async function getFamilyPriceHistory(family: string) {
     const commodityDf = df.filter(pl.col("Commodity").eq(pl.lit(commodity)));
 
     // Get prices for each date
-    const data = dates.map(date => {
+    const data = dates.map((date) => {
       const price = commodityDf
         .filter(pl.col("Date").eq(date))
         .select(pl.col("Average"))
@@ -428,43 +541,40 @@ export async function getFamilyPriceHistory(family: string) {
     });
 
     // Create label based on commodity name
-    let label = commodity.replace(`${family}`, '').trim();
-    if (label.startsWith('(') && label.endsWith(')')) {
+    let label = commodity.replace(`${family}`, "").trim();
+    if (label.startsWith("(") && label.endsWith(")")) {
       label = label.slice(1, -1);
     }
-    label = label || 'Normal';  // Use 'Normal' if no specific variant
+    label = label || "Normal"; // Use 'Normal' if no specific variant
 
     return {
       label,
-      data
+      data,
     };
   });
 
   return {
     labels,
-    datasets
+    datasets,
   };
 }
 
-export async function getIndividualFamilyTableData(dfIn: pl.DataFrame<any>, family: string, today: Date) {
+export async function getIndividualFamilyTableData(
+  dfIn: pl.DataFrame<any>,
+  family: string,
+  today: Date
+) {
   const df = dfIn.filter(pl.col("Family").eq(pl.lit(family)));
-  
-  const unit = df
-   .select(pl.col("Unit"))
-   .getColumn("Unit")
-   .toArray()[0];
+
+  const unit = df.select(pl.col("Unit")).getColumn("Unit").toArray()[0];
 
   // Get today's and yesterday's data
-  const todayDf = df.filter(
-    pl.col("Date").eq(pl.lit(today))
-  );
+  const todayDf = df.filter(pl.col("Date").eq(pl.lit(today)));
 
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
-  const yesterdayDf = df.filter(
-    pl.col("Date").eq(pl.lit(yesterday))
-  );
+
+  const yesterdayDf = df.filter(pl.col("Date").eq(pl.lit(yesterday)));
 
   // Process commodities data for today
   const commodityPrices: any[] = [];
@@ -474,17 +584,19 @@ export async function getIndividualFamilyTableData(dfIn: pl.DataFrame<any>, fami
     .getColumn("Commodity")
     .toArray()
     .map((commodity: string) => {
-      const commodityDf = todayDf.filter(pl.col("Commodity").eq(pl.lit(commodity)));
+      const commodityDf = todayDf.filter(
+        pl.col("Commodity").eq(pl.lit(commodity))
+      );
       const price = commodityDf
-       .select(pl.col("Average"))
-       .getColumn("Average")
-       .toArray();
+        .select(pl.col("Average"))
+        .getColumn("Average")
+        .toArray();
 
-      let name = commodity.replace(`${family}`, '').trim();
-      if (name.startsWith('(') && name.endsWith(')')) {
+      let name = commodity.replace(`${family}`, "").trim();
+      if (name.startsWith("(") && name.endsWith(")")) {
         name = name.slice(1, -1);
       }
-      name = name || 'Normal';
+      name = name || "Normal";
 
       const priceValue = price.length > 0 ? price[0].toFixed(2) : "N/A";
       if (price.length > 0) {
@@ -493,14 +605,17 @@ export async function getIndividualFamilyTableData(dfIn: pl.DataFrame<any>, fami
 
       return {
         name,
-        price: priceValue
+        price: priceValue,
       };
     });
 
   // Calculate average
-  const averagePrice = commodityPrices.length > 0
-    ? (commodityPrices.reduce((a, b) => a + b, 0) / commodityPrices.length).toFixed(2)
-    : "N/A";
+  const averagePrice =
+    commodityPrices.length > 0
+      ? (
+          commodityPrices.reduce((a, b) => a + b, 0) / commodityPrices.length
+        ).toFixed(2)
+      : "N/A";
 
   // Calculate change percentage
   let changePercent = "N/A";
@@ -529,7 +644,7 @@ export async function getIndividualFamilyTableData(dfIn: pl.DataFrame<any>, fami
     average: `${averagePrice} / ${unit}`,
     commodities,
     changePercent,
-    changeSign
+    changeSign,
   };
 }
 
@@ -546,11 +661,11 @@ export async function getCommonItemsTableData() {
 
   const latest = df.select(pl.col("Date")).getColumn("Date").max();
   const today = new Date(latest);
-  
+
   const tablePromises = commonItems.map((item) => {
     return getIndividualFamilyTableData(df, item, today);
   });
-  const tableData = await Promise.all(tablePromises)
+  const tableData = await Promise.all(tablePromises);
 
   return tableData;
 }

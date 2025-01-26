@@ -56,7 +56,7 @@ export default function SeasonData() {
       <Table
         isHeaderSticky
         aria-label="Price Table"
-        className="max-h-96 overflow-y-auto w-full bg-white"
+        className="max-h-screen pt-20 pb-0 overflow-y-auto w-full bg-white"
       >
         <TableHeader>
           <TableColumn>NAME</TableColumn>
