@@ -117,7 +117,7 @@ export default function LineGraph() {
           },
           title: {
             display: true,
-            text: "Average commodity prices for the last 7 days",
+            text: "Average commodity prices for the last " + selected,
             font: {
               size: 16,
             },
