@@ -28,13 +28,12 @@ export default function ArrivalPieChart() {
       try {
         const arrivalData = await uniqueArrivalsYesterday();
 
-        console.log(arrivalData);
+        const sortedEntries = Array.from(arrivalData.entries()).sort(
+          (a, b) => b[1] - a[1]
+        );
 
-        const labels = Array.from(arrivalData.keys());
-        const values = Array.from(arrivalData.values());
-
-        console.log("labels: ", labels);
-        console.log("values: ", values);
+        const labels = sortedEntries.map((entry) => entry[0]);
+        const values = sortedEntries.map((entry) => entry[1]);
 
         const chartData: ChartData = {
           labels: labels,
