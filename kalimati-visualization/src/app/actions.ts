@@ -439,6 +439,11 @@ const commonItems = [
   "Coriander Green",
   "Christophine",
   "Mushroom",
+  "Onion Green",
+  "Garlic Green",
+  "Garlic Dry",
+  "Sugarbeet",
+  "Banana",
 ];
 
 export async function seasonMostCommon() {
