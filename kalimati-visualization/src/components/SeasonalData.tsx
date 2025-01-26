@@ -1,6 +1,6 @@
 "use client";
 
-import { getCommonItemsTableData, seasonMostCommon } from "@/app/actions";
+import { getEvergreenItemsTableData, getOtherItemsTableData, seasonMostCommon } from "@/app/actions";
 import {
   Button,
   Table,
@@ -15,6 +15,8 @@ import {
   ModalHeader,
   ModalBody,
   useDisclosure,
+  Tabs,
+  Tab,
 } from "@nextui-org/react";
 import { Fragment, useEffect, useState } from "react";
 import { InfoIcon, TimelineIcon } from "./Icons";
@@ -30,7 +32,18 @@ export default function SeasonData() {
     const ret = await seasonMostCommon();
     console.log(ret);
     setSeasonData(ret);
-    setData(await getCommonItemsTableData());
+    setData([
+      {
+        id: "evergreen",
+        label: "Evergreen Items",
+        content: await getEvergreenItemsTableData(),
+      },
+      {
+        id: "other",
+        label: "Other Items",
+        content: await getOtherItemsTableData(),
+      },
+    ]);
   }
 
   useEffect(() => {
@@ -53,83 +66,89 @@ export default function SeasonData() {
           )}
         </ModalContent>
       </Modal>
-      <Table
-        isHeaderSticky
-        aria-label="Price Table"
-        className="max-h-screen pt-20 pb-0 overflow-y-auto w-full bg-white"
-      >
-        <TableHeader>
-          <TableColumn>NAME</TableColumn>
-          <TableColumn>PRICE (Rs.)</TableColumn>
-          <TableColumn>
-            <Tooltip content="Compared to Yesterday's Prices" showArrow={true}>
-              <div className="flex flex-row items-center gap-3 w-full">
-                <p>%</p>
-                <InfoIcon size={16} />
-              </div>
-            </Tooltip>
-          </TableColumn>
-          <TableColumn>GRAPH</TableColumn>
-        </TableHeader>
-        <TableBody items={data}>
-          {(item) => (
-            <TableRow key={item.name}>
-              <TableCell>{item.name}</TableCell>
-              <TableCell>
-                <Tooltip
-                  content={
-                    <div>
-                      {item.commodities.map(
-                        (
-                          commodity: { name: any; price: any },
-                          index: number
-                        ) => (
-                          <Fragment key={index}>
-                            {commodity.name}: {commodity.price}
-                            <br />
-                          </Fragment>
-                        )
-                      )}
+      <Tabs fullWidth className="pt-5 w-full" aria-label="Commodity Type" items={data}>
+        {(item) => (
+          <Tab className="w-full" key={item.id} title={item.label}>
+            <Table
+              isHeaderSticky
+              aria-label="Price Table"
+              className="w-full max-h-[80vh] overflow-y-auto"
+              >
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>PRICE (Rs.)</TableColumn>
+                <TableColumn>
+                  <Tooltip content="Compared to Yesterday's Prices" showArrow={true}>
+                    <div className="flex flex-row items-center gap-3 w-full">
+                      <p>%</p>
+                      <InfoIcon size={16} />
                     </div>
-                  }
-                  showArrow={true}
-                >
-                  <div className="flex flex-row items-center gap-3 w-full">
-                    <p>{item.average}</p>
-                    <InfoIcon size={14} />
-                  </div>
-                </Tooltip>
-              </TableCell>
-              <TableCell>
-                <p
-                  className={
-                    item.changeSign === -1
-                      ? "text-green-300"
-                      : item.changeSign === 1
-                      ? "text-red-300"
-                      : ""
-                  }
-                >
-                  {item.changePercent}
-                </p>
-              </TableCell>
-              <TableCell>
-                <Button
-                  isIconOnly
-                  color="default"
-                  variant="faded"
-                  onPress={() => {
-                    setFamily(item.name);
-                    onOpen();
-                  }}
-                >
-                  <TimelineIcon size={16} />
-                </Button>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                  </Tooltip>
+                </TableColumn>
+                <TableColumn>GRAPH</TableColumn>
+              </TableHeader>
+              <TableBody items={item.content}>
+                {(item: any) => (
+                  <TableRow key={item.name}>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>
+                      <Tooltip
+                        content={
+                          <div>
+                            {item.commodities.map(
+                              (
+                                commodity: { name: any; price: any },
+                                index: number
+                              ) => (
+                                <Fragment key={index}>
+                                  {commodity.name}: {commodity.price}
+                                  <br />
+                                </Fragment>
+                              )
+                            )}
+                          </div>
+                        }
+                        showArrow={true}
+                      >
+                        <div className="flex flex-row items-center gap-3 w-full">
+                          <p>{item.average}</p>
+                          <InfoIcon size={14} />
+                        </div>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <p
+                        className={
+                          item.changeSign === -1
+                          ? "text-green-600"
+                            : item.changeSign === 1
+                            ? "text-red-600"
+                            : ""
+                        }
+                      >
+                        {item.changePercent}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        isIconOnly
+                        color="default"
+                        variant="faded"
+                        onPress={() => {
+                          setFamily(item.name);
+                          onOpen();
+                        }}
+                      >
+                        <TimelineIcon size={16} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Tab>
+        )}
+      </Tabs>
     </>
   );
 }

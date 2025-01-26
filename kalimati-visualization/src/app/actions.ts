@@ -486,7 +486,7 @@ export async function getFamilyList(): Promise<
   return ret;
 }
 
-export async function getFamilyPriceHistory(family: string) {
+export async function getFamilyPriceHistory(family: string, numDays: number = 7) {
   const df = pl
     .readCSV(DataFile.PriceData, {
       dtypes: {
@@ -512,7 +512,7 @@ export async function getFamilyPriceHistory(family: string) {
     .toArray();
 
   // Calculate date range (7 days including today)
-  const dates = Array.from({ length: 7 }, (_, i) => {
+  const dates = Array.from({ length: numDays }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     return date;
@@ -648,7 +648,7 @@ export async function getIndividualFamilyTableData(
   };
 }
 
-export async function getCommonItemsTableData() {
+export async function getEvergreenItemsTableData() {
   const df = pl.readCSV(DataFile.PriceData, {
     dtypes: {
       Date: pl.Datetime(),
@@ -663,6 +663,72 @@ export async function getCommonItemsTableData() {
   const today = new Date(latest);
 
   const tablePromises = commonItems.map((item) => {
+    return getIndividualFamilyTableData(df, item, today);
+  });
+  const tableData = await Promise.all(tablePromises);
+
+  return tableData;
+}
+
+function getSeason(month: number): string {
+  if (month === 11 || month === 0 || month === 1) {
+    return "Winter";
+  } else if (month >= 2 && month <= 4) {
+    return "Spring";
+  } else if (month >= 5 && month <= 7) {
+    return "Summer";
+  } else if (month >= 8 && month <= 10) {
+    return "Autumn";
+  } else {
+    throw new Error("Invalid month. Please provide a value between 0 and 11.");
+  }
+}
+
+export async function getOtherItemsTableData() {
+  const df = pl.readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Commodity: pl.Utf8,
+      Unit: pl.Utf8,
+    },
+  });
+
+  const df2 = pl.readCSV(DataFile.Combined, {
+    dtypes: {
+      Family: pl.Utf8,
+      Season: pl.Utf8,
+      Arrival: pl.Int64,
+    },
+  }).select(pl.col("Family"), pl.col("Season"), pl.col("Arrival"));
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  // @ts-ignore
+  const items: string[] = df.select(pl.col("Family")).unique().toObject()["Family"];
+  const otherItems = items.filter(x => !commonItems.includes(x));
+
+  // const currentSeason = "Summer";
+  const currentSeason = getSeason(today.getMonth());
+
+  // @ts-ignore
+  const sortedItems: string[] = df2
+    .filter(
+      pl.col("Season").eq(pl.lit(currentSeason))
+      .and(pl.col("Family").isIn(otherItems))
+    )
+    .groupBy("Family")
+    .agg(pl.col("Arrival").sum().alias("TotalArrival"))
+    .sort(pl.col("TotalArrival"), true)
+    .select(pl.col("Family"))
+    .toObject()["Family"];
+
+  const excludedItems = otherItems.filter(x => !sortedItems.includes(x));
+  const finalItems = [...sortedItems, ...excludedItems];
+
+  const tablePromises = finalItems.map((item) => {
     return getIndividualFamilyTableData(df, item, today);
   });
   const tableData = await Promise.all(tablePromises);
