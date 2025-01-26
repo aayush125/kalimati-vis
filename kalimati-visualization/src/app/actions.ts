@@ -69,6 +69,54 @@ export async function uniqueArrivalsYesterday() {
   return arrivals;
 }
 
+export async function calculateAveragesFast(numDays: number) {
+  const df = pl
+  .readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+    },
+  })
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  // Calculate date range (including today)
+  const dates = Array.from({ length: numDays }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    return date;
+  }).reverse();
+
+  // Format dates for labels
+  const labels = dates.map((date) => {
+    if (numDays > 365) {
+      return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })
+    } else {
+      return date.toLocaleDateString("en-GB", { month: "short", day: "2-digit"})
+    }
+  });
+
+  // Get prices for each date
+  const prices = df
+    .select(pl.col("Average"), pl.col("Date"))
+    .filter(pl.col("Date").gtEq(dates[0]))
+    .groupBy("Date")
+    .agg(pl.col("Average").mean().alias("DailyAvg"))
+    .toObject();
+
+  const data: any = dates.map((date) => {
+    // @ts-ignore
+    const index = prices["Date"].findIndex(e => e.getTime() == date.getTime())
+    return index === -1 ? null : prices["DailyAvg"][index];
+  });
+
+  return {
+    labels,
+    data,
+  };
+}
+
 export async function calculateAverages(
   timeRange: "7D" | "1M" | "1Y"
 ): Promise<Map<string, number>> {
@@ -498,8 +546,6 @@ export async function getFamilyPriceHistory(family: string, numDays: number = 7)
     })
     .filter(pl.col("Family").eq(pl.lit(family)));
 
-  // console.log(df.select(pl.col("Commodity")).unique().toObject());
-
   const latest = df.select(pl.col("Date")).getColumn("Date").max();
   const today = new Date(latest);
 
@@ -511,7 +557,7 @@ export async function getFamilyPriceHistory(family: string, numDays: number = 7)
     .getColumn("Commodity")
     .toArray();
 
-  // Calculate date range (7 days including today)
+  // Calculate date range (including today)
   const dates = Array.from({ length: numDays }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
@@ -519,9 +565,13 @@ export async function getFamilyPriceHistory(family: string, numDays: number = 7)
   }).reverse();
 
   // Format dates for labels
-  const labels = dates.map((date) =>
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  );
+  const labels = dates.map((date) => {
+    if (numDays > 365) {
+      return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })
+    } else {
+      return date.toLocaleDateString("en-GB", { month: "short", day: "2-digit"})
+    }
+  });
 
   // Process data for each commodity
   const datasets = commodities.map((commodity: string) => {
@@ -529,15 +579,15 @@ export async function getFamilyPriceHistory(family: string, numDays: number = 7)
     const commodityDf = df.filter(pl.col("Commodity").eq(pl.lit(commodity)));
 
     // Get prices for each date
-    const data = dates.map((date) => {
-      const price = commodityDf
-        .filter(pl.col("Date").eq(date))
-        .select(pl.col("Average"))
-        .getColumn("Average")
-        .toArray();
+    const prices = commodityDf
+      .select(pl.col("Average"), pl.col("Date"))
+      .filter(pl.col("Date").gtEq(dates[0]))
+      .toObject();
 
-      // Return null if no price found for that day
-      return price.length > 0 ? price[0] : null;
+    const data = dates.map((date) => {
+      // @ts-ignore
+      const index = prices["Date"].findIndex(e => e.getTime() == date.getTime())
+      return index === -1 ? null : prices["Average"][index];
     });
 
     // Create label based on commodity name

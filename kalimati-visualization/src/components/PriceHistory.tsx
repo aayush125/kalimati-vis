@@ -42,7 +42,15 @@ export default function PriceHistory({ family }: { family: string }) {
     },
     {
       label: "1Y",
-      days: 365
+      days: 365,
+    },
+    {
+      label: "5Y",
+      days: 1825,
+    },
+    {
+      label: "10Y",
+      days: 3650,
     },
   ];
   const [selected, setSelected] = useState(7);
@@ -53,9 +61,10 @@ export default function PriceHistory({ family }: { family: string }) {
     chartRef.current.data = await getFamilyPriceHistory(family, selected);
     chartRef.current.data.datasets.forEach((e) => {
       // @ts-ignore
-      e.pointRadius = selected === 365 ? 1 : 5;
-    })
-    // pointHoverRadius: selected === "1Y" ? 3 : 7,
+      e.pointRadius = selected > 100 ? 1 : 5;
+    });
+    // @ts-ignore
+    chartRef.current.options.scales.x.ticks.font.size = selected > 365 ? 16 : 20;
     chartRef.current.update();
   }
 
@@ -96,6 +105,11 @@ export default function PriceHistory({ family }: { family: string }) {
               display: true,
               text: "Day",
             },
+            ticks: {
+              font: {
+                size: 14,
+              }
+            }
             // ticks: {
             //   maxRotation: 45,
             //   minRotation: 45,

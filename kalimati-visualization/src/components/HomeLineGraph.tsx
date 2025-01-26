@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { lastSevenAverages, calculateAverages } from "@/app/actions";
+import { lastSevenAverages, calculateAverages, calculateAveragesFast } from "@/app/actions";
 import {
   Chart,
   CategoryScale,
@@ -36,30 +36,36 @@ export default function LineGraph() {
     values: number[];
   } | null>(null);
 
-  const [selected, setSelected] = useState("7D");
-  const buttons = ["7D", "1M", "1Y"];
+  const buttons = [
+    {
+      label: "7D",
+      days: 7,
+    },
+    {
+      label: "1M",
+      days: 30,
+    },
+    {
+      label: "1Y",
+      days: 365,
+    },
+    {
+      label: "5Y",
+      days: 1825,
+    },
+    {
+      label: "10Y",
+      days: 3650,
+    },
+  ];
+  const [selected, setSelected] = useState(buttons[0]);
 
-  const fetchNewData = async (selectionStr: String) => {
-    let selection: "7D" | "1M" | "1Y";
-    switch (selectionStr) {
-      case "7D":
-        selection = "7D";
-        break;
-      case "1M":
-        selection = "1M";
-        break;
-      case "1Y":
-        selection = "1Y";
-        break;
-      default:
-        selection = "7D";
-        break;
-    }
+  const fetchNewData = async (numDays: number) => {
     try {
-      const avgs = await calculateAverages(selection);
+      const avgs = await calculateAveragesFast(numDays);
       setChartData({
-        labels: Array.from(avgs.keys()),
-        values: Array.from(avgs.values()),
+        labels: avgs.labels,
+        values: avgs.data,
       });
     } catch (error) {
       console.error("Error fetching data for the chart:", error);
@@ -104,8 +110,8 @@ export default function LineGraph() {
             borderColor: "rgb(75, 192, 192)",
             backgroundColor: "rgba(75, 192, 192, 0.5)",
             tension: 0.1,
-            pointRadius: selected === "1Y" ? 1 : 5,
-            pointHoverRadius: selected === "1Y" ? 3 : 7,
+            pointRadius: selected.days > 100 ? 1 : 5,
+            pointHoverRadius: selected.days > 100 ? 3 : 7,
           },
         ],
       },
@@ -117,9 +123,18 @@ export default function LineGraph() {
           },
           title: {
             display: true,
-            text: "Average commodity prices for the last " + selected,
+            text: "Average commodity prices for the last " + selected.label,
             font: {
               size: 16,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              font: {
+                size: selected.days > 365 ? 16 : 20,
+              },
             },
           },
         },
@@ -141,18 +156,18 @@ export default function LineGraph() {
       <div className="flex flex-row gap-2">
         {buttons.map((btn) => (
           <button
-            key={btn}
+            key={btn.label}
             onClick={async () => {
               setSelected(btn);
-              await fetchNewData(btn);
+              await fetchNewData(btn.days);
             }}
             className={`w-10 rounded-lg transition ${
-              selected === btn
+              selected.days === btn.days
                 ? "bg-stone-200 text-black"
                 : "bg-transparent text-gray-500 hover:bg-gray-100"
             }`}
           >
-            {btn}
+            {btn.label}
           </button>
         ))}
       </div>
