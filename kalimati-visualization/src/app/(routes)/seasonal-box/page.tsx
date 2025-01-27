@@ -139,13 +139,21 @@ const SeasonalBoxplot: React.FC<BoxplotProps> = () => {
               weight: "bold",
             },
           },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const final = context.formattedValue;
+                return [`Mean: ${final.mean}`, `Median: ${final.median}`, `Q1: ${final.q1} | Q3: ${final.q3}`, `Min: ${final.min} | Max: ${final.max}`]
+              }
+            }
+          }
         },
         scales: {
           y: {
             beginAtZero: true,
             title: {
               display: true,
-              text: "Value",
+              text: "Value (Rs.)",
             },
           },
           x: {
