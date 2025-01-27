@@ -495,12 +495,13 @@ export async function seasonMostCommon() {
 
 export async function priceVsArrival(
   familyName: string
-): Promise<BubbleDataPoint[]> {
+) {
   const df = pl.readCSV(DataFile.Combined, {
     dtypes: {
       Arrival: pl.Float64,
       "Average - Mean": pl.Float64,
       Family: pl.Utf8,
+      Date: pl.Datetime(),
     },
   });
 
@@ -512,15 +513,18 @@ export async function priceVsArrival(
   const len = res["Arrival"].length;
 
   const ret = [];
+  const dates: string[] = [];
   for (let i = 0; i < len; i++) {
     const point: BubbleDataPoint = {
       x: Number(res["Arrival"][i]),
-      y: Number(res["Average - Mean"][i]),
+      y: Number(res["Average - Mean"][i]), 
     };
     ret.push(point);
+    // @ts-ignore
+    dates.push(res["Date"][i].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }))
   }
 
-  return ret;
+  return { data: ret, dates };
 }
 
 export async function getFamilyList(): Promise<

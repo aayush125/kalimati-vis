@@ -56,7 +56,18 @@ export default function PriceArrivalScatter() {
     if (!chartRef.current) return;
     const res = await priceVsArrival(id.toString());
     console.log(res);
-    chartRef.current.data.datasets[0].data = res;
+    chartRef.current.data.datasets[0].data = res.data;
+
+    // @ts-ignore
+    chartRef.current.options.plugins.tooltip = {
+      callbacks: {
+        label: (context) => {
+          console.log(context.parsed)
+          console.log(context.raw)
+          return [res.dates[context.dataIndex], `Arrival: ${context.parsed.x}`, `Price: Rs. ${context.parsed.y}`];
+        }
+      }
+    };
     chartRef.current.update();
   }
 
