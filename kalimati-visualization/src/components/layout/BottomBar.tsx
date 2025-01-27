@@ -40,6 +40,14 @@ export default function BottomBar() {
       >
         Price vs Arrival
       </Link>
+      <Link
+        href="/arrival-trends"
+        className={`${
+          pathname === "/arrival-trends" ? "text-blue-500" : "text-white"
+        } hover:text-blue-700`}
+      >
+        Arrival Trends
+      </Link>
     </div>
   );
 }

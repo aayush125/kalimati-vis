@@ -47,6 +47,7 @@ Chart.register(
   BoxPlotController,
   BoxAndWiskers
 );
+Chart.defaults.font.size = 20;
 
 const SeasonalBoxplot: React.FC<BoxplotProps> = () => {
   const chartRef = useRef<HTMLCanvasElement>(null);

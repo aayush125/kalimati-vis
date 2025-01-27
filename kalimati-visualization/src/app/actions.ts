@@ -1,7 +1,6 @@
 "use server";
 
 import { BubbleDataPoint } from "chart.js";
-import { time } from "console";
 import pl from "nodejs-polars";
 
 enum DataFile {
@@ -43,7 +42,7 @@ export async function uniqueArrivalsYesterday() {
   const df = pl.readCSV("data/arrival.csv", {
     dtypes: {
       Date: pl.Datetime(),
-      Arrival: pl.Int64,
+      Arrival: pl.Float64,
       Family: pl.Utf8,
     },
   });
@@ -618,7 +617,7 @@ export async function getFamilyPriceHistory(family: string, numDays: number = 7)
   };
 }
 
-export async function getIndividualFamilyTableData(
+async function getIndividualFamilyTableData(
   dfIn: pl.DataFrame<any>,
   family: string,
   today: Date
@@ -758,7 +757,7 @@ export async function getOtherItemsTableData() {
     dtypes: {
       Family: pl.Utf8,
       Season: pl.Utf8,
-      Arrival: pl.Int64,
+      Arrival: pl.Float64,
     },
   }).select(pl.col("Family"), pl.col("Season"), pl.col("Arrival"));
 
@@ -793,4 +792,48 @@ export async function getOtherItemsTableData() {
   const tableData = await Promise.all(tablePromises);
 
   return tableData;
+}
+
+export async function getArrivalBarChartYearlyData(familyName: string, groupBy: "season" | "year") {
+  const df = pl.readCSV(DataFile.Combined, {
+    dtypes: {
+      Arrival: pl.Float64,
+      Family: pl.Utf8,
+      Date: pl.Datetime(),
+      Season: pl.Utf8,
+    },
+  }).filter(pl.col("Family").eq(pl.lit(familyName)));
+
+  if (groupBy === "year") {
+    const res = df
+      .withColumn(pl.col("Date").date.year().alias("Year"))
+      .groupBy("Year")
+      .agg(pl.col("Arrival").mean().alias("Data"))
+      .filter(pl.col("Year").gtEq(2022).and(pl.col("Year").lt(2025)))
+      .sort("Year")
+      .toObject();
+
+      return {
+        labels: res["Year"],
+        data: res["Data"],
+      };
+  } else {
+    const seasons = ["Winter", "Spring", "Summer", "Autumn"];
+
+    const res = df
+      .groupBy("Season")
+      .agg(pl.col("Arrival").mean().alias("Data"))
+      .toObject();
+    
+    const data = seasons.map((e) => {
+      const i = res["Season"].findIndex(s => s === e);
+      if (i === -1) return 0;
+      else return res["Data"][i];
+    });
+
+    return {
+      labels: seasons,
+      data,
+    };
+  }
 }
