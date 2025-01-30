@@ -29,6 +29,7 @@ Chart.register(
   Legend,
   LineController
 );
+Chart.defaults.font.size = 20;
 
 export default function PriceDistribution() {
   const [items, setItems] = useState<string[]>([]);

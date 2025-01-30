@@ -1,7 +1,6 @@
 "use server";
 
 import { BubbleDataPoint } from "chart.js";
-import { time } from "console";
 import pl from "nodejs-polars";
 
 enum DataFile {
@@ -43,7 +42,7 @@ export async function uniqueArrivalsYesterday() {
   const df = pl.readCSV("data/arrival.csv", {
     dtypes: {
       Date: pl.Datetime(),
-      Arrival: pl.Int64,
+      Arrival: pl.Float64,
       Family: pl.Utf8,
     },
   });
@@ -67,6 +66,54 @@ export async function uniqueArrivalsYesterday() {
   });
 
   return arrivals;
+}
+
+export async function calculateAveragesFast(numDays: number) {
+  const df = pl
+  .readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+    },
+  })
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  // Calculate date range (including today)
+  const dates = Array.from({ length: numDays }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    return date;
+  }).reverse();
+
+  // Format dates for labels
+  const labels = dates.map((date) => {
+    if (numDays > 365) {
+      return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })
+    } else {
+      return date.toLocaleDateString("en-GB", { month: "short", day: "2-digit"})
+    }
+  });
+
+  // Get prices for each date
+  const prices = df
+    .select(pl.col("Average"), pl.col("Date"))
+    .filter(pl.col("Date").gtEq(dates[0]))
+    .groupBy("Date")
+    .agg(pl.col("Average").mean().alias("DailyAvg"))
+    .toObject();
+
+  const data: any = dates.map((date) => {
+    // @ts-ignore
+    const index = prices["Date"].findIndex(e => e.getTime() == date.getTime())
+    return index === -1 ? null : prices["DailyAvg"][index];
+  });
+
+  return {
+    labels,
+    data,
+  };
 }
 
 export async function calculateAverages(
@@ -391,6 +438,11 @@ const commonItems = [
   "Coriander Green",
   "Christophine",
   "Mushroom",
+  "Onion Green",
+  "Garlic Green",
+  "Garlic Dry",
+  "Sugarbeet",
+  "Banana",
 ];
 
 export async function seasonMostCommon() {
@@ -442,12 +494,13 @@ export async function seasonMostCommon() {
 
 export async function priceVsArrival(
   familyName: string
-): Promise<BubbleDataPoint[]> {
+) {
   const df = pl.readCSV(DataFile.Combined, {
     dtypes: {
       Arrival: pl.Float64,
       "Average - Mean": pl.Float64,
       Family: pl.Utf8,
+      Date: pl.Datetime(),
     },
   });
 
@@ -459,15 +512,18 @@ export async function priceVsArrival(
   const len = res["Arrival"].length;
 
   const ret = [];
+  const dates: string[] = [];
   for (let i = 0; i < len; i++) {
     const point: BubbleDataPoint = {
       x: Number(res["Arrival"][i]),
-      y: Number(res["Average - Mean"][i]),
+      y: Number(res["Average - Mean"][i]), 
     };
     ret.push(point);
+    // @ts-ignore
+    dates.push(res["Date"][i].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }))
   }
 
-  return ret;
+  return { data: ret, dates };
 }
 
 export async function getFamilyList(): Promise<
@@ -486,7 +542,7 @@ export async function getFamilyList(): Promise<
   return ret;
 }
 
-export async function getFamilyPriceHistory(family: string) {
+export async function getFamilyPriceHistory(family: string, numDays: number = 7) {
   const df = pl
     .readCSV(DataFile.PriceData, {
       dtypes: {
@@ -497,8 +553,6 @@ export async function getFamilyPriceHistory(family: string) {
       },
     })
     .filter(pl.col("Family").eq(pl.lit(family)));
-
-  // console.log(df.select(pl.col("Commodity")).unique().toObject());
 
   const latest = df.select(pl.col("Date")).getColumn("Date").max();
   const today = new Date(latest);
@@ -511,17 +565,21 @@ export async function getFamilyPriceHistory(family: string) {
     .getColumn("Commodity")
     .toArray();
 
-  // Calculate date range (7 days including today)
-  const dates = Array.from({ length: 7 }, (_, i) => {
+  // Calculate date range (including today)
+  const dates = Array.from({ length: numDays }, (_, i) => {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     return date;
   }).reverse();
 
   // Format dates for labels
-  const labels = dates.map((date) =>
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  );
+  const labels = dates.map((date) => {
+    if (numDays > 365) {
+      return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })
+    } else {
+      return date.toLocaleDateString("en-GB", { month: "short", day: "2-digit"})
+    }
+  });
 
   // Process data for each commodity
   const datasets = commodities.map((commodity: string) => {
@@ -529,15 +587,15 @@ export async function getFamilyPriceHistory(family: string) {
     const commodityDf = df.filter(pl.col("Commodity").eq(pl.lit(commodity)));
 
     // Get prices for each date
-    const data = dates.map((date) => {
-      const price = commodityDf
-        .filter(pl.col("Date").eq(date))
-        .select(pl.col("Average"))
-        .getColumn("Average")
-        .toArray();
+    const prices = commodityDf
+      .select(pl.col("Average"), pl.col("Date"))
+      .filter(pl.col("Date").gtEq(dates[0]))
+      .toObject();
 
-      // Return null if no price found for that day
-      return price.length > 0 ? price[0] : null;
+    const data = dates.map((date) => {
+      // @ts-ignore
+      const index = prices["Date"].findIndex(e => e.getTime() == date.getTime())
+      return index === -1 ? null : prices["Average"][index];
     });
 
     // Create label based on commodity name
@@ -559,7 +617,7 @@ export async function getFamilyPriceHistory(family: string) {
   };
 }
 
-export async function getIndividualFamilyTableData(
+async function getIndividualFamilyTableData(
   dfIn: pl.DataFrame<any>,
   family: string,
   today: Date
@@ -648,7 +706,7 @@ export async function getIndividualFamilyTableData(
   };
 }
 
-export async function getCommonItemsTableData() {
+export async function getEvergreenItemsTableData() {
   const df = pl.readCSV(DataFile.PriceData, {
     dtypes: {
       Date: pl.Datetime(),
@@ -668,4 +726,114 @@ export async function getCommonItemsTableData() {
   const tableData = await Promise.all(tablePromises);
 
   return tableData;
+}
+
+function getSeason(month: number): string {
+  if (month === 11 || month === 0 || month === 1) {
+    return "Winter";
+  } else if (month >= 2 && month <= 4) {
+    return "Spring";
+  } else if (month >= 5 && month <= 7) {
+    return "Summer";
+  } else if (month >= 8 && month <= 10) {
+    return "Autumn";
+  } else {
+    throw new Error("Invalid month. Please provide a value between 0 and 11.");
+  }
+}
+
+export async function getOtherItemsTableData() {
+  const df = pl.readCSV(DataFile.PriceData, {
+    dtypes: {
+      Date: pl.Datetime(),
+      Average: pl.Float64,
+      Family: pl.Utf8,
+      Commodity: pl.Utf8,
+      Unit: pl.Utf8,
+    },
+  });
+
+  const df2 = pl.readCSV(DataFile.Combined, {
+    dtypes: {
+      Family: pl.Utf8,
+      Season: pl.Utf8,
+      Arrival: pl.Float64,
+    },
+  }).select(pl.col("Family"), pl.col("Season"), pl.col("Arrival"));
+
+  const latest = df.select(pl.col("Date")).getColumn("Date").max();
+  const today = new Date(latest);
+
+  // @ts-ignore
+  const items: string[] = df.select(pl.col("Family")).unique().toObject()["Family"];
+  const otherItems = items.filter(x => !commonItems.includes(x));
+
+  // const currentSeason = "Summer";
+  const currentSeason = getSeason(today.getMonth());
+
+  // @ts-ignore
+  const sortedItems: string[] = df2
+    .filter(
+      pl.col("Season").eq(pl.lit(currentSeason))
+      .and(pl.col("Family").isIn(otherItems))
+    )
+    .groupBy("Family")
+    .agg(pl.col("Arrival").sum().alias("TotalArrival"))
+    .sort(pl.col("TotalArrival"), true)
+    .select(pl.col("Family"))
+    .toObject()["Family"];
+
+  const excludedItems = otherItems.filter(x => !sortedItems.includes(x));
+  const finalItems = [...sortedItems, ...excludedItems];
+
+  const tablePromises = finalItems.map((item) => {
+    return getIndividualFamilyTableData(df, item, today);
+  });
+  const tableData = await Promise.all(tablePromises);
+
+  return tableData;
+}
+
+export async function getArrivalBarChartYearlyData(familyName: string, groupBy: "season" | "year") {
+  const df = pl.readCSV(DataFile.Combined, {
+    dtypes: {
+      Arrival: pl.Float64,
+      Family: pl.Utf8,
+      Date: pl.Datetime(),
+      Season: pl.Utf8,
+    },
+  }).filter(pl.col("Family").eq(pl.lit(familyName)));
+
+  if (groupBy === "year") {
+    const res = df
+      .withColumn(pl.col("Date").date.year().alias("Year"))
+      .groupBy("Year")
+      .agg(pl.col("Arrival").mean().alias("Data"))
+      .filter(pl.col("Year").gtEq(2022).and(pl.col("Year").lt(2025)))
+      .sort("Year")
+      .toObject();
+
+      return {
+        labels: res["Year"],
+        data: res["Data"],
+      };
+  } else {
+    const seasons = ["Winter", "Spring", "Summer", "Autumn"];
+
+    const res = df
+      .groupBy("Season")
+      .agg(pl.col("Arrival").mean().alias("Data"))
+      .toObject();
+    
+    const data = seasons.map((e) => {
+      const i = res["Season"].findIndex(s => s === e);
+      if (i === -1) return 0;
+      else return res["Data"][i];
+    });
+
+    return {
+      labels: seasons,
+      data,
+    };
+  }
 }

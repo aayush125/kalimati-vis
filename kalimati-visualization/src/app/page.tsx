@@ -20,7 +20,7 @@ export default function Home() {
             <LineGraph />
           </div>
         </div>
-        <div className="w-2/5 h-full flex justify-center items-center">
+        <div className="w-2/5 h-full flex flex-col items-center overflow-visible">
           <SeasonData />
         </div>
       </div>

@@ -1,86 +1,65 @@
 "use client";
 
 import { useEffect, useState, useRef, Key } from "react";
-import { getFamilyList, priceVsArrival } from "@/app/actions";
+import { getFamilyList, getArrivalBarChartYearlyData } from "@/app/actions";
 import {
   Chart,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  LineController,
   ChartConfiguration,
-  ScatterController,
+  BarController,
 } from "chart.js";
-import { Autocomplete, AutocompleteItem, Switch } from "@nextui-org/react";
-import ChartTrendline from "chartjs-plugin-trendline";
+import { Autocomplete, AutocompleteItem, Radio, RadioGroup, Switch } from "@nextui-org/react";
 
 Chart.register(
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
   Title,
   Tooltip,
-  Legend,
-  LineController,
-  ScatterController,
-  ChartTrendline
+  BarElement,
+  BarController,
 );
 Chart.defaults.font.size = 20;
 
-const trendlineColor = "rgba(0, 0, 0, 0.6)";
-const trendlineConfig = {
-  colorMin: trendlineColor,
-  colorMax: trendlineColor,
-  width: 4,
-  lineStyle: "solid",
-  projection: false,
-  yAxisKey: "y",
-  xAxisKey: "x",
-};
-
-export default function PriceArrivalScatter() {
+export default function ArrivalTrendsBar() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const initializing = useRef<boolean>(false);
+  const family = useRef<string>("")
+
   const [families, setFamilies] = useState<{ label: string; key: string }[]>(
     []
   );
-  const [lineEnabled, setLineEnabled] = useState<boolean>(true);
+  const [selected, setSelected] = useState<"year" | "season">("year");
 
   async function onSelect(id: Key | null) {
     if (!id) return;
-    if (!chartRef.current) return;
-    const res = await priceVsArrival(id.toString());
-    console.log(res);
-    chartRef.current.data.datasets[0].data = res.data;
+    family.current = id.toString();
+    await updateChart(selected);
+  }
 
+  async function updateChart(groupBy: "year" | "season") {
+    if (!chartRef.current) return;
+    
+    const res = await getArrivalBarChartYearlyData(family.current, groupBy);
+    console.log(res);
     // @ts-ignore
-    chartRef.current.options.plugins.tooltip = {
-      callbacks: {
-        label: (context) => {
-          console.log(context.parsed)
-          console.log(context.raw)
-          return [res.dates[context.dataIndex], `Arrival: ${context.parsed.x}`, `Price: Rs. ${context.parsed.y}`];
-        }
-      }
-    };
+    chartRef.current.data.datasets[0].data = res.data;
+    chartRef.current.data.labels = res.labels;
+    // @ts-ignore
+    chartRef.current.options.plugins.title.text = `Arrival Trends - ${family.current}`;
     chartRef.current.update();
   }
 
-  function onLineToggle(enabled: boolean) {
-    setLineEnabled(enabled);
-
+  function onGroupChange(value: string) {
     if (!chartRef.current) return;
     // @ts-ignore
-    chartRef.current.data.datasets[0].trendlineLinear = enabled
-      ? trendlineConfig
-      : undefined;
-    chartRef.current.update();
+    updateChart(value);
+    // @ts-ignore
+    setSelected(value);
   }
 
   useEffect(() => {
@@ -99,42 +78,32 @@ export default function PriceArrivalScatter() {
         setFamilies(await getFamilyList());
 
         const config: ChartConfiguration = {
-          type: "scatter",
+          type: "bar",
           data: {
             datasets: [
               {
-                label: "Price vs Arrival",
+                label: "Arrival",
                 data: [],
                 // borderColor: "rgb(75, 192, 192)",
-                backgroundColor: "rgba(75, 192, 192, 0.5)",
-                // @ts-ignore
-                trendlineLinear: trendlineConfig,
+                backgroundColor: "rgba(75, 192, 192, 0.9)",
               },
             ],
           },
           options: {
             responsive: true,
             plugins: {
-              legend: {
-                position: "bottom",
-              },
               title: {
                 display: true,
-                text: "Scatter Plot - Price vs Arrival",
+                text: "Arrival Trends",
               },
             },
             scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: "Arrival (kg)",
-                },
-              },
               y: {
                 title: {
                   display: true,
-                  text: "Price (Rs)",
+                  text: "Average Arrival (kg)",
                 },
+                beginAtZero: true,
               },
             },
           },
@@ -163,7 +132,7 @@ export default function PriceArrivalScatter() {
 
   return (
     <div className="flex flex-col p-4 justify-center items-center w-full h-screen">
-      <div className="pb-20 flex gap-10 flex-row">
+      <div className="pb-20 flex gap-5 flex-col">
         <Autocomplete
           className="max-w-xs"
           defaultItems={families}
@@ -173,9 +142,10 @@ export default function PriceArrivalScatter() {
         >
           {(f) => <AutocompleteItem>{f.label}</AutocompleteItem>}
         </Autocomplete>
-        <Switch isSelected={lineEnabled} onValueChange={onLineToggle}>
-          Trendline
-        </Switch>
+        <RadioGroup label="Group By" orientation="horizontal" value={selected} onValueChange={onGroupChange}>
+          <Radio value="year">Year</Radio>
+          <Radio value="season">Season</Radio>
+        </RadioGroup>
       </div>
       <div className="w-full max-w-6xl">
         <canvas className="w-full h-full" ref={canvasRef} />
